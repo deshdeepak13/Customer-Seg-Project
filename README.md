@@ -210,20 +210,20 @@ def predict_cluster(customer: CustomerData):
 
 ## 📈 Results & Insights
 
-* **Segment A (High Spender)**:
+* **Segment A (Young Active Shoppers)**:
 
-  * High income & spending score, frequent purchases.
-  * Action: Offer premium bundles and express shipping.
+  * Moderate spending score, High purchase frequency, Mid-range purchases.
+  * Action: Offer: Frequent shopper discounts, New collection previews, Loyalty program bonuses
 
-* **Segment B (Value Seeker)**:
+* **Segment B (Middle-aged Value Seekers)**:
 
-  * Moderate income, low spending score.
-  * Action: Promote discounts and loyalty rewards.
+  * Balanced spending, Lower purchase frequency, Average purchases.
+  * Action: Offer: Bulk purchase deals, Seasonal sales, Family package offers.
 
-* **Segment C (Loyal Regular)**:
+* **Segment C (Senior Premium Customers)**:
 
-  * Long membership, steady purchase frequency.
-  * Action: Upsell and referral incentives.
+  * High-value purchases, Moderate frequency, Strong brand loyalty.
+  * Action: Offer: Exclusive VIP memberships, Luxury product bundles, Personal shopping assistance.
 
 ---
 
