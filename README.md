@@ -54,27 +54,24 @@ Traditional customer grouping relies on static rules (e.g., demographic buckets)
 ```
 
 .
-├── backend/
-│   ├── main.py                # FastAPI app (entry point)
-│   ├── requirements.txt       # Python dependencies
-│   └── model/
-│       ├── scaler.pkl         # StandardScaler object
-│       ├── pca.pkl            # PCA transformer
-│       ├── kmeans\_model.pkl   # Trained KMeans
-│       └── model\_columns.json # Expected feature order
+├── app_api/
+│   ├── app/                          # FastAPI application module
+│   │   ├── main.py                   # API entry point with clustering logic
+│   │   └── model/
+│   │       ├── scaler.pkl            # Pre-fitted StandardScaler for input normalization
+│   │       ├── pca.pkl               # PCA transformer for dimensionality reduction
+│   │       ├── kmeans_model.pkl      # Trained KMeans clustering model
+│   │       └── model_columns.json    # Column order used during training
+│   ├── requirements.txt              # Python dependencies for the API
+│   └── Dockerfile                    # Containerization setup for deployment
 │
-├── data-exploration/
-│   ├── eda\_notebook.ipynb     # In-depth EDA & visualizations
-│   └── figures/               # Histogram, heatmap, pairplot outputs
+├── customer_segmentation_data.csv/     # Dataset 
+|
+|
+├── main.ipynb/     # Python Notebook 
+│   
 │
-├── frontend/
-│   ├── src/
-│   │   ├── components/        # Reusable React components
-│   │   ├── api.js             # Axios instance & API calls
-│   │   └── App.js             # Form UI & result display
-│   └── package.json           # JavaScript dependencies
-│
-└── README.md                  # Project overview & instructions
+└── README.md       # Comprehensive documentation & setup instructions
 
 ````
 
