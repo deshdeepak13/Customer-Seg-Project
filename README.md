@@ -1,5 +1,5 @@
 
-# 🧠 Intelligent Customer Segmentation System
+# 🧠 Market Segmentation System
 
 A cutting-edge, full-stack solution for segmenting customers using unsupervised machine learning, visualizing insights, and serving real-time personalized offers via a REST API. This project demonstrates end-to-end problem solving—from data exploration through model deployment—designed for production-grade performance and maintainability.
 
@@ -42,7 +42,7 @@ Traditional customer grouping relies on static rules (e.g., demographic buckets)
    - Serialize `StandardScaler`, `PCA`, and `KMeans` objects with `joblib`.  
    - Expose a `/predict` endpoint that ingests raw user data, runs the preprocessing pipeline, and returns segment + offers in JSON.
 
-7. **Interactive Frontend (React)**  
+7. **Interactive Frontend**  
    - Build a responsive form that collects user inputs.  
    - Submit via Axios to the FastAPI API.  
    - Display real-time segment and personalized offers.
@@ -59,7 +59,6 @@ Traditional customer grouping relies on static rules (e.g., demographic buckets)
 │   │   ├── main.py                   # API entry point with clustering logic
 │   │   └── model/
 │   │       ├── scaler.pkl            # Pre-fitted StandardScaler for input normalization
-│   │       ├── pca.pkl               # PCA transformer for dimensionality reduction
 │   │       ├── kmeans_model.pkl      # Trained KMeans clustering model
 │   │       └── model_columns.json    # Column order used during training
 │   ├── requirements.txt              # Python dependencies for the API
@@ -86,44 +85,122 @@ from sklearn.decomposition import PCA
 
 # Fit on training data
 scaler = StandardScaler().fit(X_numeric)
-X_scaled = scaler.transform(X_numeric)
+scaled_data = scaler.fit_transform(data_to_scale)
+scaled_df = pd.DataFrame(scaled_data, columns=columns_to_scale)
 
-pca = PCA(n_components=2, random_state=42).fit(X_scaled)
-X_pca = pca.transform(X_scaled)
+scaled_df.index =df.index
+df[columns_to_scale] = scaled_df
+joblib.dump(scaler, "scaler.pkl")
+
+pca = PCA(n_components=2, random_state=42)
+pca_components = pca.fit_transform(df.drop('cluster', axis=1, errors='ignore'))
+
+# Add PCA components to DataFrame
+df['PCA1'] = pca_components[:, 0]
+df['PCA2'] = pca_components[:, 1]
+
 ````
 
 * **Insight**: Scaling ensures features with different units don’t dominate clustering.
 * **PCA** reduces noise and enables 2D visualizations.
 
-### 2. KMeans Clustering & Validation
+
+### 2. Finding k
 
 ```python
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# Determine optimal k
-inertias, sil_scores = [], []
-for k in range(2, 8):
-    km = KMeans(n_clusters=k, random_state=42).fit(X_pca)
-    inertias.append(km.inertia_)
-    sil_scores.append(silhouette_score(X_pca, km.labels_))
+wcss = []
+for i in range(1,11):
+    kmeans = KMeans(n_clusters=i, random_state=42)
+    kmeans.fit(df)
+    wcss.append(kmeans.inertia_)
+
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, 11), wcss, marker='o',linestyle='--')
+plt.title('Elbow Method for Optimal k')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
+
+silhouette_scores = []
+for k in range(2,11):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(df)
+    score = silhouette_score(df, kmeans.labels_)
+    silhouette_scores.append(score)
+    
+
+plt.figure(figsize=(10, 6))
+plt.plot(range(2, 11), silhouette_scores, marker='o',linestyle='--')
+plt.title('Silhouette Score Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('Silhouette Score')
+plt.show()
+    
+````
+
+### 3. KMeans Clustering & Validation
+
+```python
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+# Initialize K-means with K=3 clusters
+kmeans = KMeans(n_clusters=3, random_state=42)
+labels = kmeans.fit_predict(df.drop(['cluster', 'PCA1', 'PCA2'], axis=1, errors='ignore'))
+
+# Add cluster labels to the original data
+df['cluster'] = labels
+joblib.dump(kmeans, "kmeans.pkl")
+    
 ```
 
 * **Elbow vs. Silhouette**: Combine both to pick a stable cluster count.
 
-### 3. FastAPI Predict Endpoint
+### 4. FastAPI Predict Endpoint
 
 ```python
 @app.post("/predict")
-def predict(data: UserData):
-    df = pd.DataFrame([data.dict()])
-    # One-hot encode & reindex
-    df = pd.get_dummies(df).reindex(columns=model_columns, fill_value=0)
-    # Pipeline
-    scaled = scaler.transform(df)
-    reduced = pca.transform(scaled)
-    cluster = kmeans.predict(reduced)[0]
-    return {"segment": segment_names[cluster], "offers": offers_map[cluster]}
+def predict_cluster(customer: CustomerData):
+    # Encode gender
+    input_gender = customer.gender.strip().lower()
+    gender_male = 1 if input_gender == 'male' else 0
+    gender_other = 1 if input_gender == 'other' else 0
+
+    # Encode preferred_category
+    input_category = customer.preferred_category.strip().lower()
+    category_dummies = [
+        1 if input_category == 'fashion' else 0,
+        1 if input_category == 'groceries' else 0,
+        1 if input_category == 'home & garden' else 0,
+        1 if input_category == 'sports' else 0
+    ]
+
+    # Combine features
+    features = [
+        customer.age,
+        customer.income,
+        customer.spending_score,
+        customer.membership_years,
+        customer.purchase_frequency,
+        customer.last_purchase_amount,
+        gender_male,
+        gender_other,
+        *category_dummies
+    ]
+
+    # Convert to DataFrame
+    df = pd.DataFrame([features])
+
+    # Scale numeric features
+    df.iloc[:, :6] = scaler.transform(df.iloc[:, :6])
+
+    # Predict cluster
+    cluster = kmeans.predict(df)[0]
+
+    return {"cluster": int(cluster)}
 ```
 
 * **Reindexing** protects against missing categories.
@@ -150,26 +227,45 @@ def predict(data: UserData):
 
 ---
 
+Here’s a revised and complete **📖 Usage** section to reflect your actual project structure, deployment, and mobile integration:
+
+---
+
 ## 📖 Usage
 
-1. **Backend**
+### 1. **Backend (API)**
 
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   uvicorn main:app --reload
-   ```
-2. **Frontend**
+The backend is built using **FastAPI** and exposes a `/predict` endpoint for real-time customer segmentation.
 
-   ```bash
-   cd frontend
-   npm install
-   npm start
-   ```
-3. **Test**
+To run locally:
 
-   * Navigate to `http://localhost:3000`
-   * Fill in form and submit — see your segment & offers!
+```bash
+cd app_api
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+### 2. **Frontend**
+
+The frontend (HTML/CSS/JS) is served as static files and is fully integrated with the backend.
+
+**Live Deployment:**
+The complete application (backend API + frontend) is deployed on **Hugging Face Spaces**.
+
+* **API Endpoint:** `https://deepakdesh-market-seg-api.hf.space/predict`
+* **Frontend:** Accessible from the same Hugging Face URL
+
+### 3. **Mobile Application**
+
+This web application is converted into a mobile app using **Mobiroller**, enabling seamless testing on Android/iOS.
+
+To test:
+
+* Open the mobile app (built using Mobiroller).
+* Fill in the customer details via the form.
+* Submit and instantly view the predicted customer segment and personalized marketing insights.
+
+APK: https://drive.google.com/file/d/1iiCv6Rotmn0JCUfPTQKK9SnDta3lqBXO/view?usp=sharing
 
 ---
 
